@@ -1,0 +1,111 @@
+@import "tailwindcss";
+
+@theme {
+  --color-carbon: #0F1417;
+  --color-carbon-light: #1A1F23;
+  --color-violet-support: #342844;
+  --color-violet-hover: #4B4059;
+  --color-violet-electric: #683CE4;
+  --color-violet-royal: #6045F4;
+  --color-mint: #53E6D4;
+  --color-mint-dim: #3BC4B3;
+  --color-soft-gray: #EBEBED;
+  --color-alert-red: #EF4444;
+
+  --font-heading: 'Barlow Condensed', 'Arial Narrow', sans-serif;
+  --font-body: 'Inter', system-ui, -apple-system, sans-serif;
+}
+
+/* ─── Base Resets ─── */
+*, *::before, *::after { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+
+body {
+  margin: 0; padding: 0;
+  font-family: var(--font-body);
+  background-color: var(--color-carbon);
+  color: #ffffff;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ─── Scrollbar ─── */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: var(--color-carbon); }
+::-webkit-scrollbar-thumb { background: var(--color-violet-support); border-radius: 999px; }
+::-webkit-scrollbar-thumb:hover { background: var(--color-violet-hover); }
+
+/* ─── Focus Ring ─── */
+.focus-ring:focus-visible {
+  outline: 2px solid var(--color-violet-electric);
+  outline-offset: 2px; border-radius: 4px;
+}
+
+/* ─── Animations ─── */
+@keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes slideInLeft { from { opacity: 0; transform: translateX(-16px); } to { opacity: 1; transform: translateX(0); } }
+@keyframes slideInRight { from { opacity: 0; transform: translateX(16px); } to { opacity: 1; transform: translateX(0); } }
+@keyframes pulse-dot { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+
+.animate-fade-in { animation: fadeIn 0.4s ease-out both; }
+.animate-slide-left { animation: slideInLeft 0.4s ease-out both; }
+.animate-slide-right { animation: slideInRight 0.4s ease-out both; }
+.animate-pulse-dot { animation: pulse-dot 2s ease-in-out infinite; }
+
+/* Stagger children */
+.stagger-children > *:nth-child(1) { animation-delay: 0ms; }
+.stagger-children > *:nth-child(2) { animation-delay: 60ms; }
+.stagger-children > *:nth-child(3) { animation-delay: 120ms; }
+.stagger-children > *:nth-child(4) { animation-delay: 180ms; }
+.stagger-children > *:nth-child(5) { animation-delay: 240ms; }
+.stagger-children > *:nth-child(6) { animation-delay: 300ms; }
+
+/* ─── Glass Card ─── */
+.glass-card {
+  background: linear-gradient(135deg, rgba(52, 40, 68, 0.7), rgba(75, 64, 89, 0.4));
+  border: 1px solid rgba(235, 235, 237, 0.06);
+  backdrop-filter: blur(12px); border-radius: 12px;
+}
+.glass-card-hover { transition: all 0.25s ease; }
+.glass-card-hover:hover {
+  border-color: rgba(104, 60, 228, 0.3);
+  box-shadow: 0 0 24px rgba(104, 60, 228, 0.08);
+  transform: translateY(-1px);
+}
+
+/* ─── Map Grid ─── */
+.map-grid-bg {
+  background-image:
+    linear-gradient(rgba(83, 230, 212, 0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(83, 230, 212, 0.04) 1px, transparent 1px);
+  background-size: 40px 40px;
+}
+
+/* ─── Table ─── */
+.data-table tbody tr { transition: background-color 0.2s ease; }
+.data-table tbody tr:hover { background-color: var(--color-violet-hover); }
+
+/* ─── Buttons ─── */
+.btn-primary {
+  background: linear-gradient(135deg, var(--color-violet-electric), var(--color-violet-royal));
+  color: white; font-weight: 600; padding: 0.5rem 1.25rem;
+  border-radius: 8px; border: none; cursor: pointer;
+  transition: all 0.25s ease; font-family: var(--font-body); font-size: 0.875rem;
+}
+.btn-primary:hover { box-shadow: 0 0 20px rgba(104, 60, 228, 0.4); transform: translateY(-1px); }
+.btn-primary:active { transform: translateY(0); }
+
+.btn-secondary {
+  background: rgba(83, 230, 212, 0.1); color: var(--color-mint);
+  font-weight: 600; padding: 0.5rem 1.25rem; border-radius: 8px;
+  border: 1px solid rgba(83, 230, 212, 0.2); cursor: pointer;
+  transition: all 0.25s ease; font-family: var(--font-body); font-size: 0.875rem;
+}
+.btn-secondary:hover { background: rgba(83, 230, 212, 0.2); border-color: rgba(83, 230, 212, 0.4); }
+
+.btn-ghost {
+  background: transparent; color: var(--color-mint); font-weight: 600;
+  padding: 0.5rem 1rem; border-radius: 8px; border: none; cursor: pointer;
+  transition: all 0.2s ease; font-family: var(--font-body); font-size: 0.8125rem;
+}
+.btn-ghost:hover { background: rgba(83, 230, 212, 0.08); }
