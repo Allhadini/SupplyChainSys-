@@ -1,169 +1,140 @@
-import { useState, useEffect } from 'react';
-import { fleetVehicles } from '../data/mockData';
-import { Badge } from '../components/ui';
-import { Truck, MapPin, Navigation, Activity, Zap } from 'lucide-react';
-import { MapContainer, TileLayer, Marker, Popup, useMap, Polyline, CircleMarker } from 'react-leaflet';
-import 'leaflet/dist/leaflet.css';
-import L from 'leaflet';
+import { motion } from 'framer-motion';
+import GlobalMap from '../components/Dashboard/GlobalMap';
+import FiltersPanel from '../components/Dashboard/FiltersPanel';
+import { useShipments } from '../context/ShipmentContext';
+import { Badge, ProgressBar } from '../components/ui';
+import { useState } from 'react';
+import { MapPin, Anchor, Plane, Truck, Clock, ChevronRight } from 'lucide-react';
 
-// Fix leaflet icon issue in react
-delete L.Icon.Default.prototype._getIconUrl;
-L.Icon.Default.mergeOptions({
-  iconRetinaUrl: 'https://unpkg.com/leaflet@1.7.1/dist/images/marker-icon-2x.png',
-  iconUrl: 'https://unpkg.com/leaflet@1.7.1/dist/images/marker-icon.png',
-  shadowUrl: 'https://unpkg.com/leaflet@1.7.1/dist/images/marker-shadow.png',
-});
-
-function MapUpdater({ selectedLocation }) {
-  const map = useMap();
-  useEffect(() => {
-    if (selectedLocation) {
-      map.flyTo([selectedLocation.lat, selectedLocation.lng], 8);
-    }
-  }, [selectedLocation, map]);
-  return null;
-}
+const modeIcons = { sea: Anchor, air: Plane, road: Truck };
 
 export default function FleetMap() {
-  const [selectedTruck, setSelectedTruck] = useState(fleetVehicles[0]);
-  const [showTraffic, setShowTraffic] = useState(false);
-  const [showRoutes, setShowRoutes] = useState(false);
+  const { filteredShipments, kpis } = useShipments();
+  const [selectedId, setSelectedId] = useState(null);
+  const selected = filteredShipments.find(s => s.id === selectedId);
+
+  const formatETA = (iso) => {
+    const d = new Date(iso);
+    const now = new Date();
+    const diffHrs = Math.max(0, Math.round((d - now) / 3600000));
+    if (diffHrs < 1) return 'Arriving';
+    if (diffHrs < 24) return `${diffHrs}h`;
+    return `${Math.round(diffHrs / 24)}d ${diffHrs % 24}h`;
+  };
 
   return (
-    <div className="h-[calc(100vh-8rem)] flex flex-col lg:flex-row gap-6 stagger-children">
-      {/* Map View Pane */}
-      <div className="flex-1 glass-card relative overflow-hidden flex flex-col group rounded-xl z-0">
-        <MapContainer 
-           center={[39.8283, -98.5795]} // Center of US
-           zoom={4} 
-           style={{ height: '100%', width: '100%', background: '#0F1417' }}
-           zoomControl={false}
+    <div className="h-[calc(100vh-7rem)] flex flex-col gap-4">
+      <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}>
+        <div className="flex items-end justify-between mb-4">
+          <div>
+            <h1 className="text-2xl font-bold gradient-text">Global Tracking Map</h1>
+            <p className="text-sm text-text-muted mt-1">Interactive real-time shipment visualization</p>
+          </div>
+          <div className="flex items-center gap-3">
+            <Badge variant="in transit" pulse>{kpis.inTransit} in transit</Badge>
+            {kpis.delayed > 0 && <Badge variant="delayed" pulse>{kpis.delayed} delayed</Badge>}
+          </div>
+        </div>
+        <FiltersPanel />
+      </motion.div>
+
+      <div className="flex-1 flex gap-4 min-h-0">
+        {/* Map */}
+        <div className="flex-1 glass overflow-hidden rounded-xl">
+          <GlobalMap height="100%" />
+        </div>
+
+        {/* Shipment sidebar */}
+        <motion.div
+          initial={{ opacity: 0, x: 20 }}
+          animate={{ opacity: 1, x: 0 }}
+          className="w-80 flex flex-col glass overflow-hidden"
         >
-           {/* Dark map tiles (CartoDB Dark Matter) */}
-           <TileLayer
-             url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
-             attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
-           />
-           
-           <MapUpdater selectedLocation={selectedTruck?.location} />
+          <div className="p-4 border-b border-white/[0.06]">
+            <h3 className="text-sm font-bold gradient-text">Fleet Roster</h3>
+            <p className="text-[11px] text-text-muted mt-0.5">{filteredShipments.length} active shipments</p>
+          </div>
 
-           {fleetVehicles.map(truck => (
-             <Marker 
-                key={truck.id} 
-                position={[truck.location.lat, truck.location.lng]}
-                eventHandlers={{
-                  click: () => {
-                    setSelectedTruck(truck);
-                  },
-                }}
-             >
-                <Popup className="custom-popup">
-                   <div className="text-carbon font-bold">{truck.id}</div>
-                   <div>Status: {truck.status}</div>
-                </Popup>
-             </Marker>
-           ))}
-           
-           {/* Mock Traffic Layers */}
-           {showTraffic && fleetVehicles.map((t, idx) => (
-               <CircleMarker 
-                   key={`traffic-${idx}`}
-                   center={[t.location.lat + (Math.random()*0.1 - 0.05), t.location.lng + (Math.random()*0.1 - 0.05)]}
-                   radius={15}
-                   pathOptions={{ color: t.speed < 10 ? 'red' : 'orange', fillColor: t.speed < 10 ? 'red' : 'orange', fillOpacity: 0.3 }}
-               />
-           ))}
-
-           {/* AI Optimized Routes Layer */}
-           {showRoutes && fleetVehicles.map((t, idx) => (
-               <Polyline 
-                   key={`route-${idx}`}
-                   positions={[
-                      [t.location.lat, t.location.lng],
-                      [t.location.lat + 0.5, t.location.lng + 0.5],
-                      [t.location.lat + 0.8, t.location.lng + 0.2]
-                   ]}
-                   pathOptions={{ color: '#53E6D4', weight: 4, opacity: 0.8, dashArray: '10, 10' }}
-               />
-           ))}
-        </MapContainer>
-        
-        {/* Toggles overlays */}
-        {/* Toggles overlays */}
-        <div className="absolute top-4 right-4 flex space-x-2 z-[400]">
-            <button 
-                onClick={() => setShowTraffic(!showTraffic)}
-                className={`glass-card px-4 py-2 text-sm font-medium transition-colors flex items-center shadow-lg ${showTraffic ? 'bg-violet-electric text-white' : 'hover:bg-violet-support text-white bg-carbon/80'}`}
-            >
-                <Activity className="w-4 h-4 mr-2" /> Live Traffic: {showTraffic ? 'ON' : 'OFF'}
-            </button>
-            <button 
-                onClick={() => setShowRoutes(!showRoutes)}
-                className={`glass-card px-4 py-2 text-sm font-medium transition-colors flex items-center shadow-lg ${showRoutes ? 'bg-mint text-carbon' : 'hover:bg-violet-support text-white bg-carbon/80'}`}
-            >
-                <Zap className="w-4 h-4 mr-2" /> AI Routes: {showRoutes ? 'ON' : 'OFF'}
-            </button>
-        </div>
-      </div>
-
-      {/* Telemetry Sidebar */}
-      <div className="w-full lg:w-80 flex flex-col space-y-4">
-        <div className="glass-card p-5">
-           <h3 className="text-lg font-heading font-bold mb-4 flex items-center">
-              <Truck className="w-5 h-5 mr-2 text-violet-electric" /> Asset Telemetry
-           </h3>
-           {selectedTruck ? (
-             <div className="space-y-6 animate-fade-in">
-                <div className="flex justify-between items-center pb-4 border-b border-violet-support">
-                   <div>
-                     <div className="text-sm text-soft-gray uppercase tracking-wider font-semibold">Vehicle ID</div>
-                     <div className="text-xl font-bold text-white mt-1">{selectedTruck.id}</div>
-                   </div>
-                   <Badge variant={selectedTruck.status}>{selectedTruck.status}</Badge>
-                </div>
-                
-                <div className="grid grid-cols-2 gap-4">
-                   <div className="bg-carbon-light rounded-lg p-3 border border-violet-support">
-                      <div className="text-xs text-soft-gray mb-1">Speed</div>
-                      <div className="text-lg font-bold text-mint">{selectedTruck.speed} <span className="text-sm font-normal text-soft-gray">mph</span></div>
-                   </div>
-                   <div className="bg-carbon-light rounded-lg p-3 border border-violet-support">
-                      <div className="text-xs text-soft-gray mb-1">Heading</div>
-                      <div className="text-lg font-bold text-white">NW <span className="text-sm font-normal text-soft-gray">315°</span></div>
-                   </div>
-                </div>
-
-                <div>
-                   <div className="flex justify-between text-sm mb-2">
-                      <span className="text-soft-gray">Fuel / Charge Level</span>
-                      <span className="font-bold text-white">{selectedTruck.fuel}%</span>
-                   </div>
-                   <div className="w-full bg-carbon rounded-full h-2.5 outline outline-1 outline-violet-support">
-                     <div className="bg-gradient-to-r from-violet-electric to-mint h-2.5 rounded-full" style={{ width: `${selectedTruck.fuel}%` }}></div>
-                   </div>
-                </div>
-                
-                <button className="w-full btn-secondary mt-4 flex items-center justify-center">
-                  Ping Driver <Navigation className="w-4 h-4 ml-2" />
-                </button>
-             </div>
-           ) : (
-             <div className="text-soft-gray text-center py-8">Select a vehicle on the map to view live telemetry.</div>
-           )}
-        </div>
-        
-        {/* Active Units list */}
-        <div className="glass-card flex-1 p-5 overflow-hidden flex flex-col">
-            <h3 className="text-lg font-heading font-bold mb-3">Active Units ({fleetVehicles.length})</h3>
-            <div className="flex-1 overflow-y-auto pr-2 space-y-2">
-               {fleetVehicles.map(t => (
-                  <div key={t.id} onClick={() => setSelectedTruck(t)} className={`p-3 rounded-lg border cursor-pointer transition-colors flex justify-between items-center ${selectedTruck?.id === t.id ? 'bg-violet-support/50 border-violet-electric' : 'bg-carbon border-transparent hover:border-violet-support'}`}>
-                     <span className="font-mono text-sm">{t.id}</span>
-                     <div className={`w-2 h-2 rounded-full ${t.status === 'Active' ? 'bg-mint' : 'bg-yellow-500'}`}></div>
+          <div className="flex-1 overflow-y-auto p-2 space-y-1">
+            {filteredShipments.map(s => {
+              const ModeIcon = modeIcons[s.mode] || Anchor;
+              const isSelected = selectedId === s.id;
+              return (
+                <motion.div
+                  key={s.id}
+                  whileHover={{ x: 2 }}
+                  onClick={() => setSelectedId(isSelected ? null : s.id)}
+                  className={`p-3 rounded-xl cursor-pointer transition-all border ${
+                    isSelected
+                      ? 'bg-purple-start/10 border-purple-start/20'
+                      : 'border-transparent hover:bg-white/[0.03]'
+                  }`}
+                >
+                  <div className="flex items-center justify-between mb-1.5">
+                    <div className="flex items-center gap-2">
+                      <ModeIcon className={`w-3.5 h-3.5 ${
+                        s.status === 'Delayed' ? 'text-rose' : 'text-purple-start'
+                      }`} />
+                      <span className="text-xs font-mono font-bold text-text-primary">{s.id}</span>
+                    </div>
+                    <Badge variant={s.status}>{s.status}</Badge>
                   </div>
-               ))}
-            </div>
-        </div>
+
+                  <div className="flex items-center gap-1 text-[10px] text-text-muted mb-2">
+                    <MapPin className="w-2.5 h-2.5" />
+                    <span className="truncate">{s.origin}</span>
+                    <ChevronRight className="w-2.5 h-2.5" />
+                    <span className="truncate">{s.destination}</span>
+                  </div>
+
+                  <ProgressBar
+                    value={s.progress}
+                    size="sm"
+                    color={s.status === 'Delayed' ? 'rose' : 'purple'}
+                    showLabel={false}
+                  />
+
+                  {isSelected && (
+                    <motion.div
+                      initial={{ opacity: 0, height: 0 }}
+                      animate={{ opacity: 1, height: 'auto' }}
+                      className="mt-3 pt-3 border-t border-white/[0.06] space-y-2 text-[11px]"
+                    >
+                      <div className="flex justify-between text-text-secondary">
+                        <span>Carrier</span>
+                        <span className="text-text-primary font-medium">{s.carrier}</span>
+                      </div>
+                      <div className="flex justify-between text-text-secondary">
+                        <span>Cargo</span>
+                        <span className="text-text-primary font-medium">{s.cargo}</span>
+                      </div>
+                      <div className="flex justify-between text-text-secondary">
+                        <span>ETA</span>
+                        <span className="text-text-primary font-medium flex items-center gap-1">
+                          <Clock className="w-3 h-3" />{formatETA(s.eta)}
+                        </span>
+                      </div>
+                      <div className="flex justify-between text-text-secondary">
+                        <span>Weight</span>
+                        <span className="text-text-primary font-medium">{s.weight}</span>
+                      </div>
+                      <div className="flex justify-between text-text-secondary">
+                        <span>Containers</span>
+                        <span className="text-text-primary font-medium">{s.containers}</span>
+                      </div>
+                      {s.predictedDelay > 0 && (
+                        <div className="flex justify-between">
+                          <span className="text-rose">Predicted Delay</span>
+                          <span className="text-rose font-bold">+{s.predictedDelay}h</span>
+                        </div>
+                      )}
+                    </motion.div>
+                  )}
+                </motion.div>
+              );
+            })}
+          </div>
+        </motion.div>
       </div>
     </div>
   );

@@ -1,189 +1,178 @@
-import { useState, useEffect } from 'react';
-import { Badge, Modal } from '../components/ui';
-import { Search, Filter, ChevronDown, FileText, User, PlusCircle } from 'lucide-react';
-// Fallback local shipments if backend fails
-import { shipments as initialShipments } from '../data/mockData';
+import { useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { useShipments } from '../context/ShipmentContext';
+import { Badge, Modal, ProgressBar } from '../components/ui';
+import { Search, Package, MapPin, Clock, Anchor, Plane, Truck, ChevronDown, ArrowUpDown } from 'lucide-react';
+
+const modeIcons = { sea: Anchor, air: Plane, road: Truck };
 
 export default function Shipments() {
+  const { filteredShipments } = useShipments();
   const [selectedShipment, setSelectedShipment] = useState(null);
-  const [showCreate, setShowCreate] = useState(false);
-  const [masterList, setMasterList] = useState(initialShipments);
-  
-  const [newShipment, setNewShipment] = useState({
-    origin: '',
-    destination: '',
-    cargo: ''
+  const [searchQuery, setSearchQuery] = useState('');
+  const [sortField, setSortField] = useState('status');
+  const [sortDir, setSortDir] = useState('asc');
+
+  const toggleSort = (field) => {
+    if (sortField === field) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
+    else { setSortField(field); setSortDir('asc'); }
+  };
+
+  const searched = filteredShipments.filter(s =>
+    s.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    s.carrier.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    s.origin.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    s.destination.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  const sorted = [...searched].sort((a, b) => {
+    const aVal = a[sortField] || '';
+    const bVal = b[sortField] || '';
+    if (sortDir === 'asc') return aVal > bVal ? 1 : -1;
+    return aVal < bVal ? 1 : -1;
   });
 
-  // Fetch true DB shipments on mount
-  useEffect(() => {
-    fetch('http://localhost:5000/api/shipments', {
-       headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-       }
-    })
-    .then(res => res.json())
-    .then(data => {
-       if (data.success && data.data && data.data.length > 0) {
-          // Transform DB object to match UI
-          const formatted = data.data.map(s => ({
-             id: s._id.slice(-6).toUpperCase(),
-             originalId: s._id,
-             destination: s.destination,
-             driver: 'Auto Dispatch', 
-             status: s.status,
-             eta: s.route?.[0]?.estimatedArrival || 'TBD',
-             risk: s.riskScore > 0.7 ? 'Severe' : s.riskScore > 0.4 ? 'High' : 'Low',
-             cargo: s.origin + ' Cargo'
-          }));
-          setMasterList(formatted);
-       }
-    })
-    .catch(err => console.log('Using mock shipments'));
-  }, []);
-
-  const handleCreateShipment = async (e) => {
-    e.preventDefault();
-    try {
-      const res = await fetch('http://localhost:5000/api/shipments/create', {
-        method: 'POST',
-        headers: { 
-           'Content-Type': 'application/json',
-           'Authorization': `Bearer ${localStorage.getItem('token')}`
-        },
-        body: JSON.stringify({
-          origin: newShipment.origin,
-          destination: newShipment.destination,
-          currentLocation: { lat: 34.05, long: -118.24 } // Default origin coords (LA)
-        }),
-      });
-      const data = await res.json();
-      if (data.success) {
-         setMasterList([{
-           id: data.data._id.slice(-6).toUpperCase(),
-           destination: data.data.destination,
-           driver: 'Pending Dispatch',
-           status: data.data.status,
-           eta: 'TBD',
-           risk: 'Low',
-           cargo: newShipment.cargo || 'General Freight'
-         }, ...masterList]);
-         setShowCreate(false);
-         setNewShipment({ origin: '', destination: '', cargo: '' });
-         alert("Shipment successfully tracked in the database.");
-      } else {
-         alert("Failed to create. Are you logged in?");
-      }
-    } catch (err) {
-      alert("Error reaching backend. Note: Login to the database first through top right corner.");
-    }
+  const formatETA = (iso) => {
+    const d = new Date(iso);
+    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) + ' ' +
+           d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false });
   };
 
   return (
-    <div className="stagger-children max-w-7xl mx-auto space-y-6">
-      <header className="flex justify-between items-end mb-8">
-        <div>
-           <h1 className="text-3xl font-heading font-bold text-white tracking-wide">Master Shipments</h1>
-           <p className="text-soft-gray mt-1">Global database of all active and scheduled logistics.</p>
-        </div>
-        <button className="btn-primary flex items-center" onClick={() => setShowCreate(true)}>
-           <PlusCircle className="w-4 h-4 mr-2" /> Create Tracked Shipment
-        </button>
-      </header>
+    <div className="max-w-[1600px] mx-auto space-y-6">
+      <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}>
+        <h1 className="text-2xl font-bold gradient-text">Shipment Registry</h1>
+        <p className="text-sm text-text-muted mt-1">Complete manifest of all tracked logistics operations</p>
+      </motion.div>
 
-      {/* Database Controls */}
-      <div className="glass-card p-4 flex flex-col md:flex-row gap-4 items-center justify-between">
-         <div className="relative w-full md:w-96">
-            <Search className="w-5 h-5 absolute left-3 top-1/2 -translate-y-1/2 text-soft-gray" />
-            <input 
-              type="text" 
-              placeholder="Search ID, destination, or driver..." 
-              className="w-full bg-carbon border border-violet-support rounded-lg pl-10 pr-4 py-2.5 text-white focus-ring transition-colors focus:border-violet-electric"
+      {/* Search */}
+      <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="glass p-4">
+        <div className="flex items-center gap-3">
+          <div className="flex items-center glass-subtle px-3 py-2 rounded-xl flex-1 group focus-within:border-purple-start/30 transition-all">
+            <Search className="w-4 h-4 text-text-muted mr-2 group-focus-within:text-purple-start transition-colors" />
+            <input
+              type="text"
+              placeholder="Search by ID, carrier, origin, destination..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="bg-transparent border-none text-sm text-text-primary focus:outline-none w-full placeholder:text-text-muted"
             />
-         </div>
-      </div>
+          </div>
+          <div className="text-xs text-text-muted">
+            {sorted.length} of {filteredShipments.length} shown
+          </div>
+        </div>
+      </motion.div>
 
-      {/* Master Data Table */}
-      <div className="glass-card overflow-hidden">
-         <div className="overflow-x-auto">
-            <table className="w-full data-table text-left border-collapse">
-               <thead>
-                 <tr className="bg-carbon-light/50 border-b border-violet-support text-soft-gray uppercase text-xs tracking-wider">
-                   <th className="py-4 px-6 font-semibold">BOL ID</th>
-                   <th className="py-4 px-6 font-semibold">Destination Corridor</th>
-                   <th className="py-4 px-6 font-semibold">Driver / Asset</th>
-                   <th className="py-4 px-6 font-semibold">Cargo</th>
-                   <th className="py-4 px-6 font-semibold">ETA</th>
-                   <th className="py-4 px-6 font-semibold">Status</th>
-                 </tr>
-               </thead>
-               <tbody>
-                  {masterList.map((s) => (
-                    <tr 
-                       key={s.id} 
-                       className="border-b border-white/5 cursor-pointer hover:bg-violet-support/30 transition-colors"
-                       onClick={() => setSelectedShipment(s)}
-                    >
-                      <td className="py-4 px-6 font-mono text-violet-electric font-medium">{s.id}</td>
-                      <td className="py-4 px-6 font-medium text-white">{s.destination}</td>
-                      <td className="py-4 px-6 flex items-center">
-                          <div className="w-6 h-6 rounded-full bg-violet-hover flex items-center justify-center mr-2 text-[10px] font-bold">{s.driver.charAt(0)}</div>
-                          {s.driver}
-                      </td>
-                      <td className="py-4 px-6 text-soft-gray">{s.cargo}</td>
-                      <td className="py-4 px-6 text-soft-gray">{s.eta}</td>
-                      <td className="py-4 px-6"><Badge variant={s.status}>{s.status}</Badge></td>
-                    </tr>
-                  ))}
-               </tbody>
-            </table>
-         </div>
-      </div>
-
-      {/* Add Shipment Modal */}
-      <Modal isOpen={showCreate} onClose={() => setShowCreate(false)} title="Add Tracked Shipment">
-         <form onSubmit={handleCreateShipment} className="space-y-4">
-            <div>
-               <label className="block text-soft-gray text-sm mb-1">Origin City/Hub</label>
-               <input type="text" required value={newShipment.origin} onChange={e => setNewShipment({...newShipment, origin: e.target.value})} className="w-full bg-carbon border border-violet-support rounded px-3 py-2 text-white focus-ring" placeholder="e.g. LAX Hub" />
-            </div>
-            <div>
-               <label className="block text-soft-gray text-sm mb-1">Destination City/Hub</label>
-               <input type="text" required value={newShipment.destination} onChange={e => setNewShipment({...newShipment, destination: e.target.value})} className="w-full bg-carbon border border-violet-support rounded px-3 py-2 text-white focus-ring" placeholder="e.g. JFK Hub" />
-            </div>
-            <div>
-               <label className="block text-soft-gray text-sm mb-1">Cargo Description</label>
-               <input type="text" required value={newShipment.cargo} onChange={e => setNewShipment({...newShipment, cargo: e.target.value})} className="w-full bg-carbon border border-violet-support rounded px-3 py-2 text-white focus-ring" placeholder="e.g. Lithium Batteries" />
-            </div>
-            <button type="submit" className="btn-primary w-full mt-4">Save & Track on Database</button>
-         </form>
-      </Modal>
+      {/* Table */}
+      <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }} className="glass overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-left data-table">
+            <thead>
+              <tr className="border-b border-white/[0.06] bg-white/[0.02]">
+                {[
+                  { key: 'id', label: 'Shipment ID' },
+                  { key: 'carrier', label: 'Carrier' },
+                  { key: 'origin', label: 'Origin' },
+                  { key: 'destination', label: 'Destination' },
+                  { key: 'mode', label: 'Mode' },
+                  { key: 'status', label: 'Status' },
+                  { key: 'progress', label: 'Progress' },
+                  { key: 'eta', label: 'ETA' },
+                  { key: 'priority', label: 'Priority' },
+                ].map(col => (
+                  <th
+                    key={col.key}
+                    onClick={() => toggleSort(col.key)}
+                    className="py-3.5 px-4 text-[10px] font-semibold text-text-muted uppercase tracking-wider cursor-pointer hover:text-text-secondary transition-colors select-none"
+                  >
+                    <div className="flex items-center gap-1">
+                      {col.label}
+                      {sortField === col.key && <ArrowUpDown className="w-3 h-3 text-purple-start" />}
+                    </div>
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {sorted.map((s, i) => {
+                const ModeIcon = modeIcons[s.mode] || Package;
+                return (
+                  <motion.tr
+                    key={s.id}
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    transition={{ delay: i * 0.02 }}
+                    onClick={() => setSelectedShipment(s)}
+                    className="border-b border-white/[0.03] cursor-pointer hover:bg-purple-start/[0.04] transition-colors"
+                  >
+                    <td className="py-3.5 px-4 font-mono text-xs font-bold text-purple-start">{s.id}</td>
+                    <td className="py-3.5 px-4 text-xs text-text-primary">{s.carrier}</td>
+                    <td className="py-3.5 px-4 text-xs text-text-secondary">{s.origin}</td>
+                    <td className="py-3.5 px-4 text-xs text-text-secondary">{s.destination}</td>
+                    <td className="py-3.5 px-4">
+                      <div className="flex items-center gap-1.5">
+                        <ModeIcon className="w-3 h-3 text-text-muted" />
+                        <span className="text-xs text-text-secondary capitalize">{s.mode}</span>
+                      </div>
+                    </td>
+                    <td className="py-3.5 px-4"><Badge variant={s.status} pulse={s.status === 'In Transit'}>{s.status}</Badge></td>
+                    <td className="py-3.5 px-4 w-32">
+                      <ProgressBar value={s.progress} size="sm" showLabel={false} color={s.status === 'Delayed' ? 'rose' : 'purple'} />
+                    </td>
+                    <td className="py-3.5 px-4 text-xs text-text-secondary font-mono">{formatETA(s.eta)}</td>
+                    <td className="py-3.5 px-4"><Badge variant={s.priority}>{s.priority}</Badge></td>
+                  </motion.tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </motion.div>
 
       {/* Detail Modal */}
       <Modal isOpen={!!selectedShipment} onClose={() => setSelectedShipment(null)} title="Shipment Details">
-         {selectedShipment && (
-            <div className="space-y-6">
-               <div className="flex justify-between items-start">
-                  <div>
-                    <h4 className="text-2xl font-mono text-violet-electric font-bold mb-1">{selectedShipment.id}</h4>
-                    <p className="text-soft-gray">Bill of Lading: BOL-9948271</p>
-                  </div>
-                  <Badge variant={selectedShipment.status}>{selectedShipment.status}</Badge>
-               </div>
-               
-               {/* Rest of the UI same as before */}
-               <div className="grid grid-cols-2 gap-4">
-                   <div className="glass-card p-4 bg-carbon-light/50">
-                      <div className="flex items-center text-mint mb-2"><User className="w-4 h-4 mr-2" /> Driver</div>
-                      <div className="font-semibold text-white text-lg">{selectedShipment.driver}</div>
-                   </div>
-                   <div className="glass-card p-4 bg-carbon-light/50">
-                      <div className="flex items-center text-mint mb-2"><FileText className="w-4 h-4 mr-2" /> Cargo Spec</div>
-                      <div className="font-semibold text-white text-lg">{selectedShipment.cargo}</div>
-                   </div>
-               </div>
+        {selectedShipment && (
+          <div className="space-y-5">
+            <div className="flex items-start justify-between">
+              <div>
+                <h4 className="text-xl font-mono font-bold gradient-text">{selectedShipment.id}</h4>
+                <p className="text-sm text-text-muted mt-0.5">{selectedShipment.carrier}</p>
+              </div>
+              <Badge variant={selectedShipment.status} pulse>{selectedShipment.status}</Badge>
             </div>
-         )}
+
+            <div className="grid grid-cols-2 gap-3">
+              {[
+                { label: 'Origin', value: selectedShipment.origin },
+                { label: 'Destination', value: selectedShipment.destination },
+                { label: 'Cargo', value: selectedShipment.cargo },
+                { label: 'Weight', value: selectedShipment.weight },
+                { label: 'Containers', value: selectedShipment.containers },
+                { label: 'Mode', value: selectedShipment.mode.toUpperCase() },
+                { label: 'Region', value: selectedShipment.region },
+                { label: 'ETA', value: formatETA(selectedShipment.eta) },
+              ].map(item => (
+                <div key={item.label} className="glass-subtle p-3 rounded-xl">
+                  <div className="text-[10px] text-text-muted uppercase tracking-wider mb-1">{item.label}</div>
+                  <div className="text-sm font-semibold text-text-primary">{item.value}</div>
+                </div>
+              ))}
+            </div>
+
+            <ProgressBar value={selectedShipment.progress} color={selectedShipment.status === 'Delayed' ? 'rose' : 'purple'} />
+
+            {selectedShipment.predictedDelay > 0 && (
+              <div className="glass-subtle p-3 rounded-xl border border-rose/20 bg-rose/5">
+                <div className="flex items-center gap-2 text-rose text-sm font-semibold">
+                  <Clock className="w-4 h-4" />
+                  Predicted delay: +{selectedShipment.predictedDelay} hours
+                </div>
+                <p className="text-xs text-text-muted mt-1">Based on current speed and route conditions</p>
+              </div>
+            )}
+          </div>
+        )}
       </Modal>
     </div>
   );

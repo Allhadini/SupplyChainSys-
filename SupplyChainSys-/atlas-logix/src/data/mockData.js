@@ -1,79 +1,170 @@
-export let kpiData = [];
-export let shipments = [];
-export let alerts = [];
-export let fleetVehicles = [];
-export let completedShipments = [];
-export let auditLogs = [];
-export let financialKPIs = [];
-export let predictiveTrendsData = [];
+// ─── Shipment Mock Data with Real Coordinates ───
 
-try {
-  // Fetch EXACT real maritime ship data from public AIS API (Digitraffic - Finland)
-  // This is actual live telemetry from ships cruising right now.
-  const shipDataRes = await fetch('https://meri.digitraffic.fi/api/v1/locations/latest');
-  const shipData = await shipDataRes.json();
-  
-  // Pick 20 live ships from the features collection
-  const liveShips = shipData.features.slice(0, 20);
+const carriers = ['Maersk Line', 'DHL Global', 'FedEx Freight', 'CMA CGM', 'MSC', 'UPS Logistics', 'Hapag-Lloyd', 'COSCO Shipping', 'Evergreen Marine', 'Yang Ming'];
+const statuses = ['In Transit', 'In Transit', 'In Transit', 'Delivered', 'Delayed', 'In Transit', 'Customs Hold'];
+const priorities = ['Normal', 'Normal', 'High', 'Normal', 'Critical', 'Normal', 'High'];
+const modes = ['sea', 'air', 'road', 'sea', 'air'];
 
-  // Map Real Ships to Fleet Vehicles
-  fleetVehicles = liveShips.map((ship) => ({
-    id: `MMSI-${ship.mmsi}`,
-    location: { lat: ship.geometry.coordinates[1], lng: ship.geometry.coordinates[0] },
-    status: ship.properties.sog > 0 ? 'Active' : 'Maintenance', // sog = speed over ground
-    speed: Math.round(ship.properties.sog * 1.15078), // knots to mph
-    fuel: Math.floor(Math.random() * 50) + 50 // mock fuel
-  }));
+const routes = [
+  { origin: 'Shanghai, CN', dest: 'Rotterdam, NL', oLat: 31.23, oLng: 121.47, dLat: 51.92, dLng: 4.48 },
+  { origin: 'Los Angeles, US', dest: 'Tokyo, JP', oLat: 33.94, oLng: -118.41, dLat: 35.68, dLng: 139.69 },
+  { origin: 'Singapore, SG', dest: 'Dubai, AE', oLat: 1.35, oLng: 103.82, dLat: 25.20, dLng: 55.27 },
+  { origin: 'Hamburg, DE', dest: 'New York, US', oLat: 53.55, oLng: 9.99, dLat: 40.71, dLng: -74.01 },
+  { origin: 'Mumbai, IN', dest: 'Sydney, AU', oLat: 19.08, oLng: 72.88, dLat: -33.87, dLng: 151.21 },
+  { origin: 'Santos, BR', dest: 'Antwerp, BE', oLat: -23.96, oLng: -46.33, dLat: 51.22, dLng: 4.40 },
+  { origin: 'Busan, KR', dest: 'Vancouver, CA', oLat: 35.18, oLng: 129.08, dLat: 49.28, dLng: -123.12 },
+  { origin: 'Felixstowe, UK', dest: 'Lagos, NG', oLat: 51.96, oLng: 1.35, dLat: 6.45, dLng: 3.40 },
+  { origin: 'Jeddah, SA', dest: 'Mombasa, KE', oLat: 21.49, oLng: 39.19, dLat: -4.04, dLng: 39.67 },
+  { origin: 'Yokohama, JP', dest: 'Long Beach, US', oLat: 35.44, oLng: 139.64, dLat: 33.77, dLng: -118.19 },
+  { origin: 'Shenzhen, CN', dest: 'Hamburg, DE', oLat: 22.54, oLng: 114.05, dLat: 53.55, dLng: 9.99 },
+  { origin: 'Colombo, LK', dest: 'Durban, ZA', oLat: 6.93, oLng: 79.85, dLat: -29.86, dLng: 31.03 },
+  { origin: 'Piraeus, GR', dest: 'Algiers, DZ', oLat: 37.94, oLng: 23.65, dLat: 36.75, dLng: 3.06 },
+  { origin: 'Ningbo, CN', dest: 'Seattle, US', oLat: 29.87, oLng: 121.55, dLat: 47.61, dLng: -122.33 },
+  { origin: 'Tanjung Pelepas, MY', dest: 'Chennai, IN', oLat: 1.37, oLng: 103.55, dLat: 13.08, dLng: 80.27 },
+];
 
-  // Map Real Ships to Shipments table
-  shipments = liveShips.slice(0, 10).map((ship, i) => {
-     return {
-        id: `MMSI-${ship.mmsi}`, 
-        destination: `Baltic Sea Port ${i+1}`, 
-        driver: `Captain MMSI-${ship.mmsi.toString().slice(-4)}`, 
-        status: ship.properties.sog > 0 ? 'In Transit' : 'Delayed', 
-        eta: `2026-04-28 1${i}:00`, 
-        risk: ship.properties.sog === 0 ? 'High' : 'Low', 
-        cargo: i % 2 === 0 ? 'Livestock' : 'Containers',
-     };
-  });
-
-  alerts = [
-    { id: 'ALT-101', shipmentId: shipments[0]?.id || 'Unknown', type: 'Vessel Stop Alert', severity: 'Critical', message: `Live AIS data reports vessel stopped at Baltic coordinates.`, time: '10 mins ago' },
-    { id: 'ALT-102', shipmentId: shipments[1]?.id || 'Unknown', type: 'Storm Re-route', severity: 'High', message: `Captain requested detour due to live storm in the region.`, time: '25 mins ago' },
-  ];
-
-  kpiData = [
-    { id: 1, label: 'Active Live Ships', value: `${liveShips.length}`, change: '+12%', status: 'good' },
-    { id: 2, label: 'Critical Alerts', value: alerts.length.toString(), change: '+1', status: 'warning' },
-    { id: 3, label: 'On-Time Performance', value: '94.2%', change: '+0.8%', status: 'good' },
-    { id: 4, label: 'Fleet Utility', value: '88%', change: '+2%', status: 'good' },
-  ];
-
-  completedShipments = [
-    { id: 'MMSI-2309834', date: '2026-04-25', destination: 'Helsinki Hub', delivered: 'On Time' },
-    { id: 'MMSI-9283748', date: '2026-04-24', destination: 'Turku Hub', delivered: 'Late' },
-  ];
-
-  auditLogs = [
-    { id: 1, action: 'AIS Sync Completed', user: 'System', timestamp: '2026-04-27 08:00' },
-    { id: 2, action: 'Route Optimized by AI', user: 'AI Engine', timestamp: '2026-04-27 08:05' },
-    { id: 3, action: 'Alert Acknowledged', user: 'Operator', timestamp: '2026-04-27 09:12' },
-  ];
-
-  financialKPIs = [
-    { metric: 'Freight Spend', value: '$2.4M', change: '-4%' },
-    { metric: 'Cost per Nautical Mile', value: '$1.82', change: '+2%' },
-    { metric: 'Port Fees', value: '$45K', change: '-15%' },
-  ];
-
-  predictiveTrendsData = [
-    { month: 'Jan', delays: 120, onTime: 880 },
-    { month: 'Feb', delays: 95, onTime: 900 },
-    { month: 'Mar', delays: 150, onTime: 850 },
-    { month: 'Apr', delays: 80, onTime: 950 },
-  ];
-
-} catch (error) {
-  console.error("Failed to fetch real data", error);
+function generateShipmentId() {
+  const prefix = ['SCX', 'SCS', 'GLB', 'FRT'][Math.floor(Math.random() * 4)];
+  const num = Math.floor(100000 + Math.random() * 900000);
+  return `${prefix}-${num}`;
 }
+
+function hoursFromNow(h) {
+  const d = new Date();
+  d.setHours(d.getHours() + h);
+  return d.toISOString();
+}
+
+function generateProgress() {
+  return Math.floor(Math.random() * 85) + 10;
+}
+
+export function generateShipments() {
+  return routes.map((route, i) => {
+    const status = statuses[i % statuses.length];
+    const progress = status === 'Delivered' ? 100 : generateProgress();
+    const etaHours = status === 'Delivered' ? 0 : Math.floor(Math.random() * 120) + 12;
+    const mode = modes[i % modes.length];
+    const isDelayed = status === 'Delayed';
+
+    // Interpolate current position based on progress
+    const currentLat = route.oLat + (route.dLat - route.oLat) * (progress / 100);
+    const currentLng = route.oLng + (route.dLng - route.oLng) * (progress / 100);
+
+    return {
+      id: generateShipmentId(),
+      carrier: carriers[i % carriers.length],
+      status,
+      priority: isDelayed ? 'Critical' : priorities[i % priorities.length],
+      mode,
+      eta: hoursFromNow(etaHours),
+      origin: route.origin,
+      destination: route.dest,
+      originLat: route.oLat,
+      originLng: route.oLng,
+      destLat: route.dLat,
+      destLng: route.dLng,
+      currentLat,
+      currentLng,
+      progress,
+      cargo: ['Electronics', 'Auto Parts', 'Textiles', 'Chemicals', 'Food & Bev', 'Machinery', 'Pharmaceuticals', 'Raw Materials'][i % 8],
+      weight: `${(Math.random() * 40 + 5).toFixed(1)}t`,
+      containers: Math.floor(Math.random() * 12) + 1,
+      lastUpdate: new Date().toISOString(),
+      predictedDelay: isDelayed ? Math.floor(Math.random() * 48) + 4 : 0,
+      riskScore: isDelayed ? Math.random() * 0.4 + 0.6 : Math.random() * 0.4,
+      region: ['Asia Pacific', 'Europe', 'North America', 'South America', 'Middle East', 'Africa'][i % 6],
+    };
+  });
+}
+
+// Initial data
+export let shipments = generateShipments();
+
+// Simulate real-time updates
+export function updateShipments(prev) {
+  return prev.map(s => {
+    if (s.status === 'Delivered') return s;
+
+    const progressDelta = Math.random() * 2;
+    const newProgress = Math.min(s.progress + progressDelta, 100);
+    const newStatus = newProgress >= 100 ? 'Delivered' : s.status;
+
+    const currentLat = s.originLat + (s.destLat - s.originLat) * (newProgress / 100);
+    const currentLng = s.originLng + (s.destLng - s.originLng) * (newProgress / 100);
+
+    // Predictive ETA recalculation
+    const remainingPct = 100 - newProgress;
+    const baseSpeed = s.mode === 'air' ? 8 : s.mode === 'sea' ? 2 : 4; // pct/hour
+    const predictedHours = remainingPct / baseSpeed;
+    const newEta = new Date();
+    newEta.setHours(newEta.getHours() + Math.round(predictedHours));
+
+    return {
+      ...s,
+      progress: newProgress,
+      status: newStatus,
+      currentLat: currentLat + (Math.random() - 0.5) * 0.1,
+      currentLng: currentLng + (Math.random() - 0.5) * 0.1,
+      eta: newEta.toISOString(),
+      lastUpdate: new Date().toISOString(),
+      riskScore: Math.max(0, Math.min(1, s.riskScore + (Math.random() - 0.5) * 0.05)),
+    };
+  });
+}
+
+// KPI computation
+export function computeKPIs(data) {
+  const total = data.length;
+  const inTransit = data.filter(s => s.status === 'In Transit').length;
+  const delivered = data.filter(s => s.status === 'Delivered').length;
+  const delayed = data.filter(s => s.status === 'Delayed').length;
+  const customsHold = data.filter(s => s.status === 'Customs Hold').length;
+  const avgProgress = data.reduce((a, s) => a + s.progress, 0) / total;
+
+  return { total, inTransit, delivered, delayed, customsHold, avgProgress: Math.round(avgProgress) };
+}
+
+// Region analytics
+export function computeRegionData(data) {
+  const regions = {};
+  data.forEach(s => {
+    if (!regions[s.region]) regions[s.region] = { name: s.region, total: 0, delayed: 0, delivered: 0, inTransit: 0 };
+    regions[s.region].total++;
+    if (s.status === 'Delayed') regions[s.region].delayed++;
+    if (s.status === 'Delivered') regions[s.region].delivered++;
+    if (s.status === 'In Transit') regions[s.region].inTransit++;
+  });
+  return Object.values(regions);
+}
+
+// Live feed events
+export function generateFeedEvent(shipment) {
+  const events = [
+    `📦 ${shipment.id} cleared customs at ${shipment.destination}`,
+    `🚢 ${shipment.id} departed ${shipment.origin} via ${shipment.carrier}`,
+    `⚠️ ${shipment.id} weather delay reported near route`,
+    `✅ ${shipment.id} arrived at ${shipment.destination} dock`,
+    `🔄 ${shipment.id} rerouted — ETA updated`,
+    `📡 ${shipment.id} GPS ping received — ${Math.round(shipment.progress)}% complete`,
+    `🏗️ ${shipment.id} container inspection cleared`,
+    `⛽ ${shipment.id} refueling stop — ${shipment.carrier}`,
+  ];
+  return {
+    id: Date.now() + Math.random(),
+    message: events[Math.floor(Math.random() * events.length)],
+    timestamp: new Date().toLocaleTimeString(),
+    shipmentId: shipment.id,
+    type: shipment.status === 'Delayed' ? 'warning' : shipment.status === 'Delivered' ? 'success' : 'info',
+  };
+}
+
+// Timezone clocks
+export const worldClocks = [
+  { city: 'New York', tz: 'America/New_York', flag: '🇺🇸' },
+  { city: 'London', tz: 'Europe/London', flag: '🇬🇧' },
+  { city: 'Dubai', tz: 'Asia/Dubai', flag: '🇦🇪' },
+  { city: 'Singapore', tz: 'Asia/Singapore', flag: '🇸🇬' },
+  { city: 'Tokyo', tz: 'Asia/Tokyo', flag: '🇯🇵' },
+  { city: 'Sydney', tz: 'Australia/Sydney', flag: '🇦🇺' },
+];
